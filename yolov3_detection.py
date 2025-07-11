@@ -16,15 +16,33 @@ class ObjectTracker:
         current_count = self.object_counts[object_class]
         current_avg = self.average_confidences[object_class]
         
-        # Increment count
         self.object_counts[object_class] += 1
         new_count = self.object_counts[object_class]
         
-        #new_avg = (n-1)/n * old_avg + 1/n * new_value
+        #NEW_AVERAGE = (n-1)/n * old_avg + 1/n * new_value
         self.average_confidences[object_class] = (
             (current_count / new_count) * current_avg +
             (1 / new_count) * confidence
         )
+    
+    #PRINT OBJECT TRACKER STATS
+    def __str__(self):
+        """Pretty print the tracker's state"""
+        output = "\n=== Object Detection Summary ===\n"
+        if not self.object_counts:
+            return output + "No objects detected"
+        
+        max_name = max(len(name) for name in self.object_counts.keys())
+        
+        output += f"\n{'Object':<{max_name}} | Count | Avg Confidence\n"
+        output += "-" * (max_name + 20) + "\n"
+        
+        for obj in sorted(self.object_counts.keys()):
+            count = self.object_counts[obj]
+            avg_conf = self.average_confidences[obj]
+            output += f"{obj:<{max_name}} | {count:^5} | {avg_conf:.3f}\n"
+        
+        return output
     
     def get_stats(self):
         """Get current statistics"""
@@ -38,7 +56,7 @@ class ObjectTracker:
 
 def download_yolo_files():
     """Download YOLOv3 weights, config, and class names"""
-    # YOLO Configurations
+    # YOLO CONFIGURATIONS
     weights_url = "https://github.com/patrick013/Object-Detection---Yolov3/raw/master/model/yolov3.weights"
     weights_file = "yolov3.weights"
 
@@ -74,33 +92,31 @@ def load_yolo():
     layer_names = net.getLayerNames()
     output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
     
-    #Random colors for bounding boxes
+    #RANDOM COLORS FOR BOUNDING BOXES
     colors = np.random.uniform(0, 255, size=(len(classes), 3))
     
     return net, classes, colors, output_layers
 
 def process_image(image_path, net, classes, colors, output_layers, conf_threshold=0.5, nms_threshold=0.4):
     """Process image and draw bounding boxes"""
-    # Initialize tracker
     tracker = ObjectTracker()
     
-    # Load image
     image = cv2.imread(image_path)
+    if image is None:
+        raise ValueError(f"Could not read image from {image_path}")
+        
     height, width = image.shape[:2]
     
-    # Create blob from image
     blob = cv2.dnn.blobFromImage(image, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
     
-    # Detect objects
     net.setInput(blob)
     outs = net.forward(output_layers)
     
-    # Initialize lists
     class_ids = []
     confidences = []
     boxes = []
     
-    # Process detections
+    #DETECTIONS
     for out in outs:
         for detection in out:
             scores = detection[5:]
@@ -108,13 +124,11 @@ def process_image(image_path, net, classes, colors, output_layers, conf_threshol
             confidence = scores[class_id]
             
             if confidence > conf_threshold:
-                # Object detected
                 center_x = int(detection[0] * width)
                 center_y = int(detection[1] * height)
                 w = int(detection[2] * width)
                 h = int(detection[3] * height)
                 
-                # Rectangle coordinates
                 x = int(center_x - w / 2)
                 y = int(center_y - h / 2)
                 
@@ -122,26 +136,24 @@ def process_image(image_path, net, classes, colors, output_layers, conf_threshol
                 confidences.append(float(confidence))
                 class_ids.append(class_id)
     
-    # Apply non-max suppression
+    #NMS
     indexes = cv2.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
     
-    # Update tracker with final detections
+    #OBJECT TRACKER UPDATE
     for i in range(len(boxes)):
         if i in indexes:
             class_name = classes[class_ids[i]]
             confidence = confidences[i]
             tracker.update(class_name, confidence)
-    
-    # Draw boxes
-    for i in range(len(boxes)):
-        if i in indexes:
+            
+            #DRAW BOUNDING BOXES
             x, y, w, h = boxes[i]
             label = str(classes[class_ids[i]])
             color = colors[class_ids[i]]
             cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(image, f"{label} {confidences[i]:.2f}", (x, y - 10), cv2.FONT_HERSHEY_PLAIN, 1, color, 2)
+            cv2.putText(image, f"{label} {confidence:.3f}", (x, y - 10), cv2.FONT_HERSHEY_PLAIN, 1, color, 2)
     
-    return image, boxes, class_ids, confidences, tracker.get_stats()
+    return image, boxes, class_ids, confidences, tracker
 
 def display_image(image):
     """Display image using matplotlib"""
@@ -149,31 +161,21 @@ def display_image(image):
     plt.figure(figsize=(12, 8))
     plt.imshow(rgb_image)
     plt.axis('off')
+    plt.draw()
+    plt.pause(0.001)  #RENDER TIME
     plt.show()
 
-# Main execution
 if __name__ == "__main__":
-    # Download required files
     download_yolo_files()
     
-    # Load YOLO model
+    #YOLO MODEL
     net, classes, colors, output_layers = load_yolo()
     
-    # Process image (replace with your image path)
-    image_path = "your_image.jpg"  # Replace with your image path
-    processed_image, boxes, class_ids, confidences, stats = process_image(
+    image_path = "/Users/sanjaysenthil/Downloads/dog.jpg" 
+    processed_image, boxes, class_ids, confidences, tracker = process_image(
         image_path, net, classes, colors, output_layers
     )
     
-    # Display results
-    display_image(processed_image)
-    
-    # Print detections and statistics
-    print("\nDetection Statistics:")
-    print("\nObject Counts:")
-    for obj, count in stats["counts"].items():
-        print(f"{obj}: {count}")
-    
-    print("\nAverage Confidences:")
-    for obj, avg_conf in stats["averages"].items():
-        print(f"{obj}: {avg_conf:.3f}") 
+    print(tracker)
+    print("\nDisplaying image")
+    display_image(processed_image) 
