@@ -5,7 +5,7 @@ import os
 from io import BytesIO
 
 class S3Accessor:
-    def __init__(self, bucket_name, region_name="us-east-1"):
+    def __init__(self, bucket_name, region_name="us-east-2"):
         """INITIALIZE S3 CLIENT"""
         self.bucket_name = bucket_name
         self.s3_client = boto3.client('s3', region_name=region_name)

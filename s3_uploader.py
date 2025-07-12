@@ -4,7 +4,7 @@ import numpy as np
 from io import BytesIO
 
 class S3Uploader:
-    def __init__(self, bucket_name, region_name="us-east-1"):
+    def __init__(self, bucket_name, region_name="us-east-2"): 
         """INITIALIZE S3 CLIENT"""
         self.bucket_name = bucket_name
         self.s3_client = boto3.client('s3', region_name=region_name)
@@ -15,7 +15,7 @@ class S3Uploader:
         try:
             # GENERATE FRAME ID
             self.frame_counter += 1
-            frame_id = f"frame_{self.frame_counter:04d}"  # e.g., frame_0001
+            frame_id = f"frame_{self.frame_counter:04d}" 
             
             # ENCODE FRAME
             _, buffer = cv2.imencode('.jpg', frame)
