@@ -10,7 +10,7 @@ class ObjectTracker:
         self.object_counts = defaultdict(int)
         self.average_confidences = defaultdict(float)
         self.image_ids = []
-        self.target_object = None  # FOR HEAP COMPARISON
+        self.target_object = None  #FOR HEAP COMPARISON
     
     def set_target_object(self, object_type):
         """Set the object type to use for comparisons"""
@@ -24,14 +24,14 @@ class ObjectTracker:
         self_conf = self.average_confidences.get(self.target_object, 0)
         other_conf = other.average_confidences.get(self.target_object, 0)
         
-        # HANDLE EQUAL CONFIDENCES
+        #HANDLE EQUAL CONFIDENCES
         if self_conf == other_conf:
-            # EMPTY LISTS GO LAST
+            #EMPTY LISTS GO LAST
             if not self.image_ids:
                 return True
             if not other.image_ids:
                 return False
-            # USE EARLIEST FRAME AS TIEBREAKER
+            #USE EARLIEST FRAME AS TIEBREAKER
             return self.image_ids[0] < other.image_ids[0]
             
         return self_conf > other_conf  # MAINTAIN MAX HEAP
