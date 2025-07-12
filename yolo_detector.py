@@ -150,8 +150,8 @@ def process_image(frame, net, classes, colors, output_layers, conf_threshold=0.5
             x, y, w, h = boxes[i]
             label = str(classes[class_ids[i]])
             color = colors[class_ids[i]]
-            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(frame, f"{label} {confidence:.3f}", (x, y - 10), cv2.FONT_HERSHEY_PLAIN, 1, color, 2)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 4)  
+            cv2.putText(frame, f"{label} {confidence:.3f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 3)  # INCREASED FONT SCALE FROM 1 TO 1.0 AND THICKNESS FROM 2 TO 3
     
     return frame, boxes, class_ids, confidences, tracker
 
