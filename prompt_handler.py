@@ -29,8 +29,6 @@ def get_initial_prompt(USER_QUESTION):
 2. GENERAL KNOWLEDGE WHEN:
    - No reference to physically present objects
    - Abstract/historical questions
-   - MUST provide concise (15-20 word), factual answer when needs_video=false
-   - Answers must be verifiable and accurate
 
 OBJECT HANDLING RULES:
 1. MUST ONLY use these detectable COCO classes: {', '.join(COCO_CLASSES)}
@@ -44,8 +42,7 @@ USER QUESTION: "{USER_QUESTION}"
 Return ONLY this JSON (NO explanations):
 {{
     "needs_video": boolean,
-    "relevant_object": "exact-coco-class"|"no relevant object found"|null,
-    "answer": string|null  // When needs_video=false: concise, factual answer (15-20 words max)
+    "relevant_object": "exact-coco-class"|"no relevant object found"|null
 }}"""
 
 if __name__ == "__main__":
