@@ -10,7 +10,7 @@ import numpy as np
 
 # REPLACE THESE WITH YOUR AWS SETTINGS
 BUCKET_NAME = "annotated-frames"
-AWS_REGION = "us-east-1"
+AWS_REGION = "us-east-2"
 
 def display_top_frames(frame_ids, s3_accessor):
     """DISPLAY MULTIPLE FRAMES SIDE BY SIDE"""
@@ -152,7 +152,7 @@ if __name__ == "__main__":
         for future in futures:
             future.result()
         
-        # SAVE TRACKERS BEFORE HEAP OPS
+        # SAVE TRACKERS
         all_trackers = trackers.copy()
         
         # MAKE AND SHOW HEAP
