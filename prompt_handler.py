@@ -52,6 +52,22 @@ def get_collective_frames_prompt(user_question, relevant_objects=None):
     # EXTRACT OBJECT COUNTS FROM USER QUESTION
     import re
     
+    # DEFINE SEMANTIC CATEGORIES
+    CATEGORIES = {
+        'animals': ['dog', 'cat', 'bird', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe'],
+        'vehicles': ['car', 'truck', 'bus', 'motorcycle', 'bicycle', 'airplane', 'train', 'boat'],
+        'electronics': ['tv', 'laptop', 'cell phone', 'mouse', 'keyboard', 'remote'],
+        'furniture': ['chair', 'couch', 'bed', 'dining table', 'bench'],
+        'kitchenware': ['cup', 'wine glass', 'bottle', 'bowl', 'fork', 'knife', 'spoon']
+    }
+    
+    def get_category(object_name):
+        """Get the semantic category for an object"""
+        for category, items in CATEGORIES.items():
+            if object_name in items:
+                return category
+        return None
+    
     # SAFETY CHECKS FOR PLURALS AND COUNTS
     def get_expected_counts(question):
         """Extract expected counts of objects from question"""
@@ -74,27 +90,45 @@ def get_collective_frames_prompt(user_question, relevant_objects=None):
 
 IMPORTANT CONTEXT CHECKS:
 1. The user's question implies they expect to see: {', '.join(f'{obj} ({"multiple" if obj in expected_counts else "single"})' for obj in relevant_objects)}
-2. In the provided frames, carefully count each object type.
-3. If there's a mismatch between expected and actual counts, acknowledge this first.
-   Example: "I notice you asked about multiple cars, but I can only see one car in the frame. The one car I see is a Tesla Model S. The Tesla Model S is a luxury electric car known for its sleek design and advanced technology."
+2. Through my smart glasses, I'll analyze what's currently in view.
+3. Check for BOTH plural/singular mismatches AND missing objects:
+   a. For count mismatches: "I notice you asked about multiple cars, but I'm only seeing one car right now. This car is a Tesla Model S..."
+   b. For missing objects with same category present: "I notice you asked about a dog, but I'm currently seeing a different animal - a cat. This cat is..."
+   c. For completely unrelated objects: "I notice you asked about a [missing_object], but I don't see any [missing_object] in my current view. Feel free to point me towards a [missing_object] if you'd like me to take a look!"
+
+RESPONSE STRUCTURE:
+1. PLURAL CHECK FIRST:
+   - If user expects multiple but one visible: "I notice you asked about multiple [objects], but I'm only seeing one [object] right now. This [object] is..."
+   - If user expects one but multiple visible: "I notice you asked about a [object], and I can actually see several [objects] in view. These [objects] are..."
+
+2. THEN OBJECT CHECK:
+   - Same category (provide details): "I notice you asked about a [specific_object], but I'm currently seeing a different [category] - a [present_object]. This [present_object] is..."
+   - Different category (be brief): "I notice you asked about a [specific_object], but I don't see any [specific_object] in my current view. Feel free to point me towards a [specific_object] if you'd like me to take a look!"
+
+Examples:
+- Plural mismatch: "I notice you asked about multiple cars, but I'm only seeing one car right now. This car is a Tesla Model S..."
+- Category match: "I notice you asked about a dog, but I'm currently seeing a different animal - a cat. This cat is a Siamese with distinctive..."
+- Unrelated objects: "I notice you asked about a dog, but I don't see any dogs in my current view. Feel free to point me towards a dog if you'd like me to take a look!"
 
 ANALYSIS INSTRUCTIONS:
-1. Start by addressing any count mismatches between user expectations and what you see.
-2. For each object present, identify its specific type, model, or characteristics.
-3. Provide interesting details about the specific type you've identified.
-4. Keep your response conversational and around 3-4 sentences.
+1. ALWAYS check for plural/singular mismatches first
+2. Then check for missing objects:
+   - If same category found: Provide detailed description
+   - If unrelated objects: Keep response brief, don't describe unrelated objects
+3. Keep your response conversational and real-time oriented
+4. Only provide details for objects that match the user's category of interest
 
-Look at these images and identify the specific type, breed, or model of the {objects_text} shown. Each image may focus on different objects from the user's question."""
+Through my smart glasses, I'll analyze what's currently in view regarding the {objects_text} you mentioned. I'll focus on what's visible in my current field of vision."""
     else:
         prompt = f"""The user asked: "{user_question}"
 
 ANALYSIS INSTRUCTIONS:
-1. First, count and acknowledge the number of each type of object you see.
+1. First, count and acknowledge what's currently visible in my view.
 2. For each object, identify its specific type, model, or characteristics.
 3. Provide interesting details about the specific types you've identified.
-4. Keep your response conversational and around 3-4 sentences.
+4. Keep your response conversational and oriented to the current view.
 
-Look at these images and identify the specific types, breeds, or models of what you see."""
+Through my smart glasses, I'll analyze what's currently in my field of vision."""
     
     return prompt
 
