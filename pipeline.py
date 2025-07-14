@@ -21,6 +21,7 @@ class VideoPipeline:
     def __init__(self):
         self.gpt = GPTHandler()
         self.question_result = None
+        self.user_question = None  # STORE ORIGINAL QUESTION
         self.question_queue = queue.Queue()
         self.video_queue = queue.Queue()
         self.trackers = []
@@ -48,6 +49,7 @@ class VideoPipeline:
         """GET USER INPUT AND RUN GPT"""
         print("\nEnter your question about the video:")
         question = input().strip()
+        self.user_question = question  # STORE ORIGINAL QUESTION
         print("PROCESSING QUESTION WITH GPT...")
         
         prompt = get_initial_prompt(question)
@@ -173,7 +175,7 @@ class VideoPipeline:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    def describe_objects_in_frames(self, frame_ids, target_object=None):
+    def describe_objects_in_frames(self, frame_ids, user_question, target_object=None):
         """DESCRIBE OBJECTS IN FRAMES USING GPT VISION - COLLECTIVE ANALYSIS"""
         if not frame_ids:
             return "No frames available for analysis."
@@ -194,8 +196,8 @@ class VideoPipeline:
         
         print(f"Successfully loaded {len(images)} images: {successful_frames}")
         
-        # GET COLLECTIVE ANALYSIS PROMPT
-        prompt = get_collective_frames_prompt(target_object)
+        # GET COLLECTIVE ANALYSIS PROMPT WITH USER QUESTION
+        prompt = get_collective_frames_prompt(user_question, target_object)
         
         # ANALYZE ALL IMAGES TOGETHER
         description = self.gpt.describe_multiple_images_collectively(images, prompt)
@@ -241,7 +243,7 @@ class VideoPipeline:
                         print(f"Found {len(top_frames)} top frames: {top_frames}")
                         
                         print("\nDESCRIBING OBJECTS IN FRAMES...")
-                        descriptions = self.describe_objects_in_frames(top_frames, relevant_object)
+                        descriptions = self.describe_objects_in_frames(top_frames, self.user_question, relevant_object)
                         print("\nCOLLECTIVE ANALYSIS:")
                         print("=" * 60)
                         print(descriptions)
