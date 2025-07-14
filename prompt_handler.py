@@ -49,19 +49,54 @@ Return ONLY this JSON (NO explanations):
 
 def get_collective_frames_prompt(user_question, relevant_objects=None):
     """GENERATE PROMPT FOR ANALYZING MULTIPLE FRAMES TO ANSWER USER'S QUESTION"""
+    # EXTRACT OBJECT COUNTS FROM USER QUESTION
+    import re
+    
+    # SAFETY CHECKS FOR PLURALS AND COUNTS
+    def get_expected_counts(question):
+        """Extract expected counts of objects from question"""
+        counts = {}
+        words = question.lower().split()
+        for i, word in enumerate(words):
+            if word in ['these', 'those', 'the']:
+                if i + 1 < len(words) and words[i + 1].endswith('s'):
+                    base_word = words[i + 1].rstrip('s')
+                    counts[base_word] = 'multiple'
+        return counts
+    
+    expected_counts = get_expected_counts(user_question)
+    
     if relevant_objects and relevant_objects != ["no relevant object found"]:
         objects_text = ", ".join(relevant_objects)
-        return f"""The user asked: "{user_question}"
+        
+        # BUILD CONTEXT-AWARE PROMPT
+        prompt = f"""The user asked: "{user_question}"
 
-Look at these images and identify the specific type, breed, or model of the {objects_text} shown. Each image may focus on different objects from the user's question. Once you've identified them, provide general information about those specific types in a conversational way.
+IMPORTANT CONTEXT CHECKS:
+1. The user's question implies they expect to see: {', '.join(f'{obj} ({"multiple" if obj in expected_counts else "single"})' for obj in relevant_objects)}
+2. In the provided frames, carefully count each object type.
+3. If there's a mismatch between expected and actual counts, acknowledge this first.
+   Example: "I notice you asked about multiple cars, but I can only see one car in the frame. The one car I see is a Tesla Model S. The Tesla Model S is a luxury electric car known for its sleek design and advanced technology."
 
-Include specific details like the exact type or breed (Golden Retriever, iPhone 14, Tesla Model S, etc.), notable features, and interesting characteristics. For example: "This is a Golden Retriever! Golden Retrievers are friendly, intelligent dogs originally bred in Scotland for retrieving waterfowl." Keep your response conversational and around 3-4 sentences."""
+ANALYSIS INSTRUCTIONS:
+1. Start by addressing any count mismatches between user expectations and what you see.
+2. For each object present, identify its specific type, model, or characteristics.
+3. Provide interesting details about the specific type you've identified.
+4. Keep your response conversational and around 3-4 sentences.
+
+Look at these images and identify the specific type, breed, or model of the {objects_text} shown. Each image may focus on different objects from the user's question."""
     else:
-        return f"""The user asked: "{user_question}"
+        prompt = f"""The user asked: "{user_question}"
 
-Look at these images and identify the specific types, breeds, or models of what you see. Once you've identified them, provide general information about those specific items in a conversational way.
+ANALYSIS INSTRUCTIONS:
+1. First, count and acknowledge the number of each type of object you see.
+2. For each object, identify its specific type, model, or characteristics.
+3. Provide interesting details about the specific types you've identified.
+4. Keep your response conversational and around 3-4 sentences.
 
-Include specific details like exact types, breeds, or model names, notable features, and interesting characteristics. Keep your response conversational and around 3-4 sentences."""
+Look at these images and identify the specific types, breeds, or models of what you see."""
+    
+    return prompt
 
 def get_direct_answer_prompt(question):
     """GENERATE PROMPT FOR DIRECT FACTUAL ANSWERS"""

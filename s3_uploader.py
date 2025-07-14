@@ -2,6 +2,8 @@ import boto3
 import cv2
 import numpy as np
 from io import BytesIO
+import time
+import uuid
 
 class S3Uploader:
     def __init__(self, bucket_name, region_name="us-east-2"): 
@@ -13,9 +15,10 @@ class S3Uploader:
     def upload_frame(self, frame):
         """UPLOAD FRAME TO S3 AND RETURN FRAME ID"""
         try:
-            # GENERATE FRAME ID
-            self.frame_counter += 1
-            frame_id = f"frame_{self.frame_counter:04d}" 
+            # GENERATE UNIQUE FRAME ID
+            unique_id = uuid.uuid4()
+            timestamp = int(time.time())
+            frame_id = f"frame_{timestamp}_{unique_id}"
             
             # ENCODE FRAME
             _, buffer = cv2.imencode('.jpg', frame)

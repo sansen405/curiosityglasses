@@ -81,7 +81,7 @@ class VideoPipeline:
             processed_count = 0
             
             # CREATE THREAD POOL FOR S3 UPLOADS
-            with ThreadPoolExecutor(max_workers=3) as executor:
+            with ThreadPoolExecutor(max_workers=10) as executor:
                 while cap.isOpened():
                     ret, frame = cap.read()
                     if not ret:
@@ -197,6 +197,20 @@ class VideoPipeline:
                             selected_frames.append(frame_id)
                             used_frame_ids.add(frame_id)
                             print(f"Random frame for missing {obj}: {frame_id}")
+        
+        # FILL WITH RANDOM FRAMES IF LESS THAN MAX_FRAMES
+        # while len(selected_frames) < max_frames:
+        #     available_trackers = [t for t in self.trackers if t.image_ids and not any(img_id in used_frame_ids for img_id in t.image_ids)]
+        #     if available_trackers:
+        #         import random
+        #         random_tracker = random.choice(available_trackers)
+        #         if random_tracker.image_ids:
+        #             frame_id = random_tracker.image_ids[0]
+        #             selected_frames.append(frame_id)
+        #             used_frame_ids.add(frame_id)
+        #             print(f"Filling with random frame: {frame_id}")
+        #     else:
+        #         break
         
         return selected_frames
 
