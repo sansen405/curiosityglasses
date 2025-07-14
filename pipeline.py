@@ -142,6 +142,64 @@ class VideoPipeline:
         
         return top_frames[:n]
 
+    def get_frames_for_objects(self, relevant_objects, max_frames=3):
+        """GET ONE FRAME FOR EACH OBJECT, OR RANDOM FRAMES IF OBJECT NOT FOUND"""
+        if not self.trackers:
+            return []
+        
+        selected_frames = []
+        used_frame_ids = set()  # AVOID DUPLICATES
+        
+        for obj in relevant_objects[:max_frames]:  # LIMIT TO MAX_FRAMES
+            if obj == "no relevant object found":
+                # GET RANDOM FRAME THAT HASN'T BEEN USED
+                available_trackers = [t for t in self.trackers if t.image_ids and not any(img_id in used_frame_ids for img_id in t.image_ids)]
+                if available_trackers:
+                    import random
+                    random_tracker = random.choice(available_trackers)
+                    if random_tracker.image_ids:
+                        frame_id = random_tracker.image_ids[0]
+                        selected_frames.append(frame_id)
+                        used_frame_ids.add(frame_id)
+                        print(f"Random frame for unknown object: {frame_id}")
+            else:
+                # GET BEST FRAME FOR THIS SPECIFIC OBJECT
+                best_tracker = None
+                best_confidence = 0
+                
+                for tracker in self.trackers:
+                    if obj in tracker.object_counts and tracker.image_ids:
+                        # SKIP IF ALL FRAMES FROM THIS TRACKER ALREADY USED
+                        if all(img_id in used_frame_ids for img_id in tracker.image_ids):
+                            continue
+                        
+                        confidence = tracker.average_confidences.get(obj, 0)
+                        if confidence > best_confidence:
+                            best_confidence = confidence
+                            best_tracker = tracker
+                
+                if best_tracker and best_tracker.image_ids:
+                    # GET FIRST UNUSED FRAME FROM BEST TRACKER
+                    for frame_id in best_tracker.image_ids:
+                        if frame_id not in used_frame_ids:
+                            selected_frames.append(frame_id)
+                            used_frame_ids.add(frame_id)
+                            print(f"Best frame for {obj}: {frame_id} (confidence: {best_confidence:.3f})")
+                            break
+                else:
+                    # OBJECT NOT FOUND - GET RANDOM FRAME
+                    available_trackers = [t for t in self.trackers if t.image_ids and not any(img_id in used_frame_ids for img_id in t.image_ids)]
+                    if available_trackers:
+                        import random
+                        random_tracker = random.choice(available_trackers)
+                        if random_tracker.image_ids:
+                            frame_id = random_tracker.image_ids[0]
+                            selected_frames.append(frame_id)
+                            used_frame_ids.add(frame_id)
+                            print(f"Random frame for missing {obj}: {frame_id}")
+        
+        return selected_frames
+
     def display_frames(self, frame_ids):
         """DISPLAY FRAMES SIDE BY SIDE"""
         frames = []
@@ -175,12 +233,12 @@ class VideoPipeline:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    def describe_objects_in_frames(self, frame_ids, user_question, target_object=None):
+    def describe_objects_in_frames(self, frame_ids, user_question, relevant_objects=None):
         """DESCRIBE OBJECTS IN FRAMES USING GPT VISION - COLLECTIVE ANALYSIS"""
         if not frame_ids:
             return "No frames available for analysis."
         
-        print(f"\nANALYZING {len(frame_ids)} FRAMES COLLECTIVELY...")
+        print(f"\nANALYZING {len(frame_ids)} FRAMES FOR MULTIPLE OBJECTS...")
         
         # GET ALL IMAGES FROM S3
         images = []
@@ -197,7 +255,7 @@ class VideoPipeline:
         print(f"Successfully loaded {len(images)} images: {successful_frames}")
         
         # GET COLLECTIVE ANALYSIS PROMPT WITH USER QUESTION
-        prompt = get_collective_frames_prompt(user_question, target_object)
+        prompt = get_collective_frames_prompt(user_question, relevant_objects)
         
         # ANALYZE ALL IMAGES TOGETHER
         description = self.gpt.describe_multiple_images_collectively(images, prompt)
@@ -241,23 +299,23 @@ class VideoPipeline:
             print(f"Needs Video: {question_result['needs_video']}")
             
             if question_result['needs_video']:
-                relevant_object = question_result['relevant_object']
-                print(f"Relevant Object: {relevant_object}")
+                relevant_objects = question_result['relevant_objects']
+                print(f"Relevant Objects: {relevant_objects}")
                 
-                if relevant_object != "no relevant object found":
-                    print("\nGetting top 3 frames...")
-                    top_frames = self.get_top_frames(relevant_object, 3)
-                    if top_frames:
-                        print(f"Found {len(top_frames)} top frames: {top_frames}")
+                if relevant_objects and relevant_objects != ["no relevant object found"]:
+                    print("\nGetting frames for relevant objects...")
+                    selected_frames = self.get_frames_for_objects(relevant_objects, 3)
+                    if selected_frames:
+                        print(f"Found {len(selected_frames)} frames: {selected_frames}")
                         
                         print("\nDESCRIBING OBJECTS IN FRAMES...")
-                        descriptions = self.describe_objects_in_frames(top_frames, self.user_question, relevant_object)
+                        descriptions = self.describe_objects_in_frames(selected_frames, self.user_question, relevant_objects)
                         print("\nCOLLECTIVE ANALYSIS:")
                         print("=" * 60)
                         print(descriptions)
                         print("=" * 60)
                     else:
-                        print(f"No frames found containing {relevant_object}")
+                        print(f"Could not find frames for objects: {relevant_objects}")
             else:
                 print("\nProviding direct answer...")
                 answer = self.answer_question_directly(self.user_question)

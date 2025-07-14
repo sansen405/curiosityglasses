@@ -32,33 +32,36 @@ def get_initial_prompt(USER_QUESTION):
 
 OBJECT HANDLING RULES:
 1. MUST ONLY use these detectable COCO classes: {', '.join(COCO_CLASSES)}
-2. If object mentioned isn't in COCO classes: 
-   - Still return needs_video:true if visual context exists
-   - Set relevant_object to "no relevant object found"
-3. Only return null for relevant_object when needs_video is false
+2. Identify up to 3 relevant objects maximum
+3. Convert plurals to singular (cars -> car, people -> person)
+4. If object mentioned isn't in COCO classes but visual context exists:
+   - Still return needs_video:true
+   - Add "no relevant object found" to the list
+5. Return empty list for relevant_objects when needs_video is false
 
 USER QUESTION: "{USER_QUESTION}"
 
 Return ONLY this JSON (NO explanations):
 {{
     "needs_video": boolean,
-    "relevant_object": "exact-coco-class"|"no relevant object found"|null
+    "relevant_objects": ["exact-coco-class", "exact-coco-class"] or ["no relevant object found"] or []
 }}"""
 
-def get_collective_frames_prompt(user_question, target_object=None):
+def get_collective_frames_prompt(user_question, relevant_objects=None):
     """GENERATE PROMPT FOR ANALYZING MULTIPLE FRAMES TO ANSWER USER'S QUESTION"""
-    if target_object and target_object != "no relevant object found":
+    if relevant_objects and relevant_objects != ["no relevant object found"]:
+        objects_text = ", ".join(relevant_objects)
         return f"""The user asked: "{user_question}"
 
-Look at these images and identify the specific make and model of the {target_object}. Once you've identified it, provide general information about that model in a conversational way.
+Look at these images and identify the specific type, breed, or model of the {objects_text} shown. Each image may focus on different objects from the user's question. Once you've identified them, provide general information about those specific types in a conversational way.
 
-For example, if you see a Tesla Model X, don't describe this specific car in the images, but instead tell me about the Tesla Model X as a vehicle model in general. Keep your response conversational and around 3 sentences. Focus on interesting facts, features, or characteristics of that model."""
+Include specific details like the exact type or breed (Golden Retriever, iPhone 14, Tesla Model S, etc.), notable features, and interesting characteristics. For example: "This is a Golden Retriever! Golden Retrievers are friendly, intelligent dogs originally bred in Scotland for retrieving waterfowl." Keep your response conversational and around 3-4 sentences."""
     else:
         return f"""The user asked: "{user_question}"
 
-Look at these images and identify the main subject they're asking about. Once you've identified it, provide general information about that subject in a conversational way.
+Look at these images and identify the specific types, breeds, or models of what you see. Once you've identified them, provide general information about those specific items in a conversational way.
 
-Keep your response conversational and around 3 sentences. Focus on interesting facts, features, or characteristics rather than describing what's specifically shown in these images."""
+Include specific details like exact types, breeds, or model names, notable features, and interesting characteristics. Keep your response conversational and around 3-4 sentences."""
 
 def get_direct_answer_prompt(question):
     """GENERATE PROMPT FOR DIRECT FACTUAL ANSWERS"""
@@ -96,7 +99,7 @@ Be concise and precise in your responses."""
             print("-------------")
             if RESPONSE["needs_video"]:
                 print(f"This question needs video analysis.")
-                print(f"Relevant object: {RESPONSE['relevant_object']}")
+                print(f"Relevant objects: {RESPONSE['relevant_objects']}")
             else:
                 print("This question doesn't need video analysis.")
                 print(f"Answer: {RESPONSE['answer']}")
