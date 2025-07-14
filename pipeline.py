@@ -9,7 +9,7 @@ from yolo_detector import download_yolo_files, load_yolo, process_image, display
 from s3_uploader import S3Uploader
 from s3_accessor import S3Accessor
 import numpy as np
-from prompt_handler import GPTHandler, get_initial_prompt
+from prompt_handler import GPTHandler, get_initial_prompt, get_collective_frames_prompt
 from pathlib import Path
 import json
 
@@ -173,6 +173,35 @@ class VideoPipeline:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
+    def describe_objects_in_frames(self, frame_ids, target_object=None):
+        """DESCRIBE OBJECTS IN FRAMES USING GPT VISION - COLLECTIVE ANALYSIS"""
+        if not frame_ids:
+            return "No frames available for analysis."
+        
+        print(f"\nANALYZING {len(frame_ids)} FRAMES COLLECTIVELY...")
+        
+        # GET ALL IMAGES FROM S3
+        images = []
+        successful_frames = []
+        for frame_id in frame_ids:
+            image = self.s3_accessor.get_frame(frame_id)
+            if image is not None:
+                images.append(image)
+                successful_frames.append(frame_id)
+        
+        if not images:
+            return "Could not retrieve any images for analysis."
+        
+        print(f"Successfully loaded {len(images)} images: {successful_frames}")
+        
+        # GET COLLECTIVE ANALYSIS PROMPT
+        prompt = get_collective_frames_prompt(target_object)
+        
+        # ANALYZE ALL IMAGES TOGETHER
+        description = self.gpt.describe_multiple_images_collectively(images, prompt)
+        
+        return description if description else "Failed to analyze images collectively."
+
     def run(self, video_path):
         """MAIN PIPELINE EXECUTION"""
         print("\nSTARTING PIPELINE...")
@@ -206,10 +235,17 @@ class VideoPipeline:
                 print(f"Relevant Object: {relevant_object}")
                 
                 if relevant_object != "no relevant object found":
-                    print("\nTop 3 Frames:")
+                    print("\nGetting top 3 frames...")
                     top_frames = self.get_top_frames(relevant_object, 3)
                     if top_frames:
-                        self.display_frames(top_frames)
+                        print(f"Found {len(top_frames)} top frames: {top_frames}")
+                        
+                        print("\nDESCRIBING OBJECTS IN FRAMES...")
+                        descriptions = self.describe_objects_in_frames(top_frames, relevant_object)
+                        print("\nCOLLECTIVE ANALYSIS:")
+                        print("=" * 60)
+                        print(descriptions)
+                        print("=" * 60)
                     else:
                         print(f"No frames found containing {relevant_object}")
             

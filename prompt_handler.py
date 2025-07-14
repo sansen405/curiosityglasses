@@ -45,6 +45,31 @@ Return ONLY this JSON (NO explanations):
     "relevant_object": "exact-coco-class"|"no relevant object found"|null
 }}"""
 
+def get_collective_frames_prompt(target_object=None):
+    """GENERATE PROMPT FOR ANALYZING MULTIPLE FRAMES COLLECTIVELY"""
+    if target_object and target_object != "no relevant object found":
+        return f"""Analyze these images as a sequence and provide a comprehensive description focusing on the {target_object}(s) shown.
+
+Look across all the images and describe:
+1. The {target_object}(s) - appearance, color, condition, brand/model if identifiable
+2. How the {target_object} appears across the different frames
+3. The setting and environment where the {target_object} is located
+4. Any changes or different angles/perspectives shown
+5. Other notable objects or context that help understand the scene
+
+Provide one unified description that captures what you can determine about the {target_object} from viewing all these images together."""
+    else:
+        return """Analyze these images as a sequence and provide a comprehensive description of what you see.
+
+Look across all the images and describe:
+1. The main objects, people, or subjects visible
+2. The setting and environment
+3. Any actions, movements, or changes between the images
+4. The overall context or story being told
+5. Key details about colors, conditions, brands, or identifying features
+
+Provide one unified description that captures the complete scene from viewing all these images together."""
+
 if __name__ == "__main__":
     # INITIALIZE GPT
     GPT = GPTHandler()
