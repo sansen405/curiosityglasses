@@ -9,7 +9,7 @@ from yolo_detector import download_yolo_files, load_yolo, process_image, display
 from s3_uploader import S3Uploader
 from s3_accessor import S3Accessor
 import numpy as np
-from prompt_handler import GPTHandler, get_initial_prompt, get_collective_frames_prompt
+from prompt_handler import GPTHandler, get_initial_prompt, get_collective_frames_prompt, get_direct_answer_prompt
 from pathlib import Path
 import json
 
@@ -204,6 +204,14 @@ class VideoPipeline:
         
         return description if description else "Failed to analyze images collectively."
 
+    def answer_question_directly(self, question):
+        """PROVIDE DIRECT FACTUAL ANSWER FOR QUESTIONS THAT DON'T NEED VIDEO"""
+        prompt = get_direct_answer_prompt(question)
+        system_role = "You are a knowledgeable assistant that provides concise, factual answers to questions."
+        
+        answer = self.gpt.get_completion(prompt, system_role)
+        return answer if answer else "Unable to provide an answer."
+
     def run(self, video_path):
         """MAIN PIPELINE EXECUTION"""
         print("\nSTARTING PIPELINE...")
@@ -250,7 +258,24 @@ class VideoPipeline:
                         print("=" * 60)
                     else:
                         print(f"No frames found containing {relevant_object}")
+            else:
+                print("\nProviding direct answer...")
+                answer = self.answer_question_directly(self.user_question)
+                print("\nANSWER:")
+                print("=" * 40)
+                print(answer)
+                print("=" * 40)
             
+        elif question_result and not video_result:
+            print("\nVideo processing failed, but can still answer question...")
+            if not question_result['needs_video']:
+                answer = self.answer_question_directly(self.user_question)
+                print("\nANSWER:")
+                print("=" * 40)
+                print(answer)
+                print("=" * 40)
+            else:
+                print("ERROR: Video analysis required but video processing failed")
         else:
             print("ERROR: PIPELINE FAILED")
 

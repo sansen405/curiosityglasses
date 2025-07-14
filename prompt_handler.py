@@ -60,6 +60,14 @@ Look at these images and identify the main subject they're asking about. Once yo
 
 Keep your response conversational and around 3 sentences. Focus on interesting facts, features, or characteristics rather than describing what's specifically shown in these images."""
 
+def get_direct_answer_prompt(question):
+    """GENERATE PROMPT FOR DIRECT FACTUAL ANSWERS"""
+    return f"""Answer this question directly with factual information in simple, concise terms. Keep your response to 1-2 sentences and focus on key facts.
+
+Question: {question}
+
+Provide a clear, factual answer:"""
+
 if __name__ == "__main__":
     # INITIALIZE GPT
     GPT = GPTHandler()
