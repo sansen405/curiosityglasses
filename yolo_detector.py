@@ -158,3 +158,41 @@ def process_image(frame, net, classes, colors, output_layers, conf_threshold=0.5
 def display_image(image):
     cv2.imshow('Frame', image) #DISPLAY ANNOTATED FRAMES
     cv2.waitKey(1)  
+
+if __name__ == "__main__":
+    # Download and load YOLO
+    download_yolo_files()
+    net, classes, colors, output_layers = load_yolo()
+    
+    # Open video capture
+    video_path = "tesla.mp4"  # Change this to your video file
+    cap = cv2.VideoCapture(video_path)
+    
+    if not cap.isOpened():
+        print(f"Error: Could not open video file {video_path}")
+        exit()
+    
+    print("Processing video... Press 'q' to quit")
+    
+    while True:
+        # Read frame
+        ret, frame = cap.read()
+        if not ret:
+            print("End of video")
+            break
+        
+        # Process frame with YOLO
+        processed_frame, boxes, class_ids, confidences, tracker = process_image(
+            frame, net, classes, colors, output_layers
+        )
+        
+        # Display frame
+        cv2.imshow('YOLO Detection', processed_frame)
+        
+        # Break on 'q' press
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    
+    # Cleanup
+    cap.release()
+    cv2.destroyAllWindows() 

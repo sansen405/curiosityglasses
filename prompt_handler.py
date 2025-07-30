@@ -114,10 +114,10 @@ Question: {question}
 Provide a clear, factual answer:"""
 
 if __name__ == "__main__":
-    # INITIALIZE GPT
+    #INITIALIZE GPT
     GPT = GPTHandler()
     
-    # SET SYSTEM ROLE
+    #SYSTEM ROLE
     SYSTEM_ROLE = """You are an AI assistant analyzing questions about video content.
 Your task is to determine if user questions require further video context or not.
 Be concise and precise in your responses."""

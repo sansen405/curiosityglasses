@@ -6,50 +6,44 @@ import math
 import heapq
 from concurrent.futures import ThreadPoolExecutor
 from yolo_detector import download_yolo_files, load_yolo, process_image, display_image, ObjectTracker
-from s3_uploader import S3Uploader
-from s3_accessor import S3Accessor
+from local_frame_storage import LocalFrameStorage
 import numpy as np
 from prompt_handler import GPTHandler, get_initial_prompt, get_collective_frames_prompt, get_direct_answer_prompt
 from pathlib import Path
 import json
 
-# AWS SETTINGS
-BUCKET_NAME = "annotated-frames"
-AWS_REGION = "us-east-2"
-
 class VideoPipeline:
     def __init__(self):
         self.gpt = GPTHandler()
         self.question_result = None
-        self.user_question = None  # STORE ORIGINAL QUESTION
+        self.user_question = None  # STORE QUESTION
         self.question_queue = queue.Queue()
         self.video_queue = queue.Queue()
         self.trackers = []
         self.detected_objects = set()
-        self.upload_futures = []
+        self.frame_futures = []
         
-        # YOLO SETUP
+        # INIT YOLO
         print("SETTING UP YOLO...")
         download_yolo_files()
         self.net, self.classes, self.colors, self.output_layers = load_yolo()
         
-        # S3 SETUP
-        self.s3_uploader = S3Uploader(BUCKET_NAME, region_name=AWS_REGION)
-        self.s3_accessor = S3Accessor(BUCKET_NAME, region_name=AWS_REGION)
+        # INIT STORAGE
+        self.frame_storage = LocalFrameStorage()
 
-    def upload_frame_task(self, data):
-        """UPLOAD A SINGLE FRAME TO S3"""
+    def save_frame_task(self, data):
+        """SAVE FRAME AND UPDATE TRACKER"""
         processed_frame, tracker = data
-        frame_id = self.s3_uploader.upload_frame(processed_frame)
+        frame_id = self.frame_storage.save_frame(processed_frame)
         if frame_id:
             tracker.add_image_id(frame_id)
         return tracker
         
     def process_question(self):
-        """GET USER INPUT AND RUN GPT"""
+        """GET AND PROCESS USER QUESTION"""
         print("\nEnter your question about the video:")
         question = input().strip()
-        self.user_question = question  # STORE ORIGINAL QUESTION
+        self.user_question = question
         print("PROCESSING QUESTION WITH GPT...")
         
         prompt = get_initial_prompt(question)
@@ -64,14 +58,14 @@ class VideoPipeline:
             print("\nQUESTION ANALYSIS FAILED")
 
     def process_video(self, video_path):
-        """ANALYZE VIDEO FRAMES"""
+        """PROCESS VIDEO FRAMES"""
         try:
-            # SETUP VIDEO
+            # INIT VIDEO
             cap = cv2.VideoCapture(video_path)
             if not cap.isOpened():
                 raise Exception("ERROR: VIDEO FILE ACCESS FAILED")
 
-            # VIDEO SETTINGS
+            # SET FPS
             original_fps = cap.get(cv2.CAP_PROP_FPS)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             target_fps = 10
@@ -80,39 +74,39 @@ class VideoPipeline:
             frame_count = 0
             processed_count = 0
             
-            # CREATE THREAD POOL FOR S3 UPLOADS
+            # PROCESS FRAMES
             with ThreadPoolExecutor(max_workers=10) as executor:
                 while cap.isOpened():
                     ret, frame = cap.read()
                     if not ret:
                         break
                     
-                    # PROCESS EVERY Nth FRAME
+                    # PROCESS NTH FRAME
                     if frame_count % frame_interval == 0:
                         processed_count += 1
                         
-                        # DETECT OBJECTS
+                        # RUN DETECTION
                         processed_frame, boxes, class_ids, confidences, tracker = process_image(
                             frame, self.net, self.classes, self.colors, self.output_layers
                         )
                         
-                        # SAVE TRACKER AND DETECTED OBJECTS
+                        # SAVE RESULTS
                         self.trackers.append(tracker)
                         self.detected_objects.update(tracker.object_counts.keys())
                         
-                        # SUBMIT UPLOAD TASK
-                        future = executor.submit(self.upload_frame_task, (processed_frame, tracker))
-                        self.upload_futures.append(future)
+                        # SAVE FRAME
+                        future = executor.submit(self.save_frame_task, (processed_frame, tracker))
+                        self.frame_futures.append(future)
                     
                     frame_count += 1
                 
-                print("\nFRAME PROCESSING COMPLETE - WAITING FOR UPLOADS...")
-                # WAIT FOR ALL UPLOADS TO COMPLETE
-                for future in self.upload_futures:
+                print("\nFRAME PROCESSING COMPLETE - SAVING FRAMES...")
+                # WAIT FOR SAVES
+                for future in self.frame_futures:
                     future.result()
             
             cap.release()
-            print("ALL UPLOADS COMPLETE")
+            print("ALL FRAMES SAVED")
             print("VIDEO THREAD FINISHED")
             self.video_queue.put(True)
             
@@ -222,7 +216,7 @@ class VideoPipeline:
         
         # LOAD FRAMES
         for frame_id in frame_ids:
-            frame = self.s3_accessor.get_frame(frame_id)
+            frame = self.frame_storage.get_frame(frame_id)
             if frame is not None:
                 frames.append(frame)
                 max_height = max(max_height, frame.shape[0])
@@ -248,17 +242,13 @@ class VideoPipeline:
         cv2.destroyAllWindows()
 
     def describe_objects_in_frames(self, frame_ids, user_question, relevant_objects=None):
-        """DESCRIBE OBJECTS IN FRAMES USING GPT VISION - COLLECTIVE ANALYSIS"""
-        if not frame_ids:
-            return "No frames available for analysis."
-        
-        print(f"\nANALYZING {len(frame_ids)} FRAMES FOR MULTIPLE OBJECTS...")
-        
-        # GET ALL IMAGES FROM S3
+        """ANALYZE OBJECTS IN SELECTED FRAMES"""
         images = []
         successful_frames = []
+        
+        # LOAD FRAMES
         for frame_id in frame_ids:
-            image = self.s3_accessor.get_frame(frame_id)
+            image = self.frame_storage.get_frame(frame_id)
             if image is not None:
                 images.append(image)
                 successful_frames.append(frame_id)
